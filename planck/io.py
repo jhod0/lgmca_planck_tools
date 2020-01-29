@@ -9,9 +9,10 @@ import fitsio
 import healpy as hp
 import numpy as np
 
-from . import (cfact_545_857, ffp8_channel_beams, ffp8_dipole_magnitude,
-               ffp8_doppler_adjs, ffp8_theta_dipole, ffp8_phi_dipole,
-               planck_freqs)
+from .beam import ffp8_channel_beams
+from .constants import (cfact_545_857, ffp8_dipole_magnitude,
+                        ffp8_doppler_adjs, ffp8_theta_dipole, ffp8_phi_dipole,
+                        planck_freqs)
 
 
 def doppler_adjust(cmap, chani):

@@ -5,9 +5,17 @@
 
 from __future__ import division, print_function
 import camb
-from camb import model, initialpower
+# from camb import model, initialpower
 import numpy as np
 
+# FFP8 cosmology, flat \Lambda-CDM
+fiducial_ffp8_params = {
+    'ombh2': 0.0222, 'omch2': 0.1203,
+    'H0': 67.12, 'tau': 0.065,
+    'As': 2.09e-9, 'ns': 0.96,
+    'omnuh2': 0.00064}
+
+# FFP8.1 cosmology, slight adjustment to 2015 best-fit
 fiducial_ffp8_1_params = {
     'ombh2': 0.0223, 'omch2': 0.1184,
     'H0': 67.87, 'tau': 0.067,
@@ -26,7 +34,9 @@ def compute_ffp8(ombh2, omch2, omnuh2, H0, tau, As, ns):
                              nu_mass_degeneracies=[Neff/3],
                              nu_mass_fractions=[1.0],
                              nu_mass_numbers=[1],
-                             tau=tau, WantTransfer=True)
+                             tau=tau, WantTransfer=True,
+                             # By default uses PArthENoPE
+                             bbn_predictor=camb.bbn.BBN_table_interpolator())
 
     params.InitPower.set_params(As=As, ns=ns)#, r=0)
     params.Transfer.accurate_massive_neutrinos = True
@@ -38,7 +48,6 @@ def compute_ffp8(ombh2, omch2, omnuh2, H0, tau, As, ns):
 
     result = camb.get_results(params)
     return result.get_cmb_power_spectra(params, CMB_unit='muK')
-
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
