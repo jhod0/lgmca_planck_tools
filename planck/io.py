@@ -28,7 +28,8 @@ def doppler_adjust(cmap, chani):
     return cmap / (1 + ffp8_doppler_adjs[chani] * factor)
 
 
-def load_chan_realization(chan_fmt, chani, reali, lmax, doppler=True):
+def load_chan_realization(chan_fmt, chani, reali, lmax,
+                          doppler=True, beam=ffp8_channel_beams):
     '''
     Loads a single array of `D_\ells` from an FFP8 fits file, adjusting for the
     observation beam and (possibly) for doppler modulation. Returns the TT
@@ -54,13 +55,19 @@ def load_chan_realization(chan_fmt, chani, reali, lmax, doppler=True):
     ll1 = ells * (ells + 1) / (2 * np.pi)
 
     nside = hp.npix2nside(m.size)
-    beam = ffp8_channel_beams[chani, :lmax + 1] * hp.pixwin(nside)[:lmax + 1]
+    beam = beam[chani, :lmax + 1] * hp.pixwin(nside)[:lmax + 1]
 
-    adj_dls = ll1 * cls / beam**2
+    beam_msk = beam != 0
+
+    # Avoid divide-by-zero warnings
+    adj_dls = np.zeros_like(cls)
+    adj_dls[beam_msk] = (ll1 * cls)[beam_msk] / beam[beam_msk]**2
+
     return adj_dls
 
 
-def load_realization(chan_fmt, reali, lmax=3000, doppler=True):
+def load_realization(chan_fmt, reali, lmax=3000,
+                     doppler=True, beam=ffp8_channel_beams):
     '''
     Load a FFP8 realization, i.e. the `D_\ell` power spectrum for each planck
     observation channel, correcting for the channel beam and (optionally)
@@ -75,6 +82,7 @@ def load_realization(chan_fmt, reali, lmax=3000, doppler=True):
     '''
     result = np.zeros((9, lmax + 1))
     for i in range(9):
-        result[i] = load_chan_realization(chan_fmt, i, reali, lmax, doppler=doppler)
+        result[i] = load_chan_realization(chan_fmt, i, reali, lmax,
+                                          doppler=doppler, beam=beam)
     result[np.isinf(result)] = 0.0
     return result
