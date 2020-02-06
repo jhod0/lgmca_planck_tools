@@ -53,3 +53,49 @@ for i in range(3, 9):
 
 ffp8_channel_beams.setflags(write=False)
 r3_channel_beams.setflags(write=False)
+
+
+beamwf_dir = os.path.join(os.path.dirname(__file__),
+                          '..', 'data', 'rimos', 'BeamWf_HFI_R3.01')
+
+
+def load_wl_freq(chan, masktype='fullsky', maptype='', lmax=4000):
+    '''
+    Loads :math:`W_\ell^{X, Y}` for a given channel. See the PLA archive on
+    beam window functions
+    (https://wiki.cosmos.esa.int/planck-legacy-archive/index.php/Beam_Window_Functions)
+    for details on the W matrix.
+
+    :returns: `Wl`, A 3-D ndarray of dimension (lmax + 1, 6, 6), such that the
+              observed `C_\ell^{X, Y}` is `np.dot(Wl[ell], C_ell_sky)`. C_ell_sky
+              should in the order (TT, EE, BB, TE, EB, TB), the same as the
+              output of `hp.anafast`.
+    '''
+    maptypes = ('', 'hm1', 'hm2', 'even', 'odd')
+    if maptype not in maptypes:
+        raise ValueError('map type {} is invalid, should be one of: {}'.format(maptype, maptypes))
+
+    if masktype not in ('fullsky', 'plikmask'):
+        raise ValueError('unknown masktype {}, should be \'fullsky\' or \'plikmask\''.format(masktype))
+
+    beamwf_file = 'Wl_R3.01_{masktype}_{freq:03}{maptype}x{freq:03}{maptype}.fits'
+    beamwf_file = os.path.join(beamwf_dir, beamwf_file.format(masktype=masktype,
+                                                              freq=planck_freqs[chan],
+                                                              maptype=maptype))
+
+    # Matrix of (TT, EE, BB, TE, EB, TB)^2 window function
+    vectors = ['TT', 'EE', 'BB', 'TE', 'EB', 'TB']
+    output = np.zeros((lmax + 1, 6, 6), dtype=np.double)
+    # TODO get real beams for EB & TB
+    output[:, 4, 4] = output[:, 5, 5] = 1
+
+    with fitsio.FITS(beamwf_file, 'r') as fits_file:
+        # There are no headers for 'EB' & 'TB' bc they are expected to have
+        # negligible impact on the other data vectors
+        for xi, xX in enumerate(vectors[:4]):
+            this_col = fits_file[xX]
+            for yi, yY in enumerate(vectors):
+                xX_to_yY = this_col[xX + '_2_' + yY].read()[0]
+                output[:lmax + 1, yi, xi] = xX_to_yY[:lmax + 1]
+
+    return output
