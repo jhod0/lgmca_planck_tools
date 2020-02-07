@@ -5,7 +5,6 @@
 
 from __future__ import division, print_function
 
-import fitsio
 import healpy as hp
 import numpy as np
 
@@ -26,6 +25,46 @@ def doppler_adjust(cmap, chani):
 
     factor = ffp8_dipole_magnitude * cos_great_arc
     return cmap / (1 + ffp8_doppler_adjs[chani] * factor)
+
+
+def load_chan_realization_alms(chan_fmt, chani, reali, lmax):
+    '''
+    Loads a channel and computes the spherical harmonic expansion of the map.
+
+    For polarized channels (nu < 545 GHz), returns a 3-tuple of (T, E, B)
+    alms, while for unpolarized channels (545 and 857 GHz) it returns T. All
+    alms are in healpix order.
+
+    Already adjusts for the pixel window function.
+    '''
+    fname = chan_fmt.format(chan=planck_freqs[chani], real=reali)
+    if chani < 7:
+        maps = 1e6*hp.read_map(fname,
+                               field=(0, 1, 2))
+        nside = hp.npix2nside(maps[0].size)
+
+        alms = hp.map2alm(maps, pol=True, lmax=lmax)
+
+        # First adjust T by pwT, then E&B by pwE
+        pwT, pwE = hp.pixwin(nside=nside, pol=True, lmax=lmax)
+        alms[0] = hp.almxfl(alms[0], 1 / pwT)
+
+        # Set the pwE=0 \ells to 0
+        pol_adj = np.zeros_like(pwE)
+        pol_adj[pwE != 0] = 1 / pwE[pwE != 0]
+        alms[1] = hp.almxfl(alms[1], pol_adj)
+        alms[2] = hp.almxfl(alms[2], pol_adj)
+
+        return alms
+
+    factor = 1e6 / cfact_545_857[chani-7]
+    map = factor * hp.read_map(fname)
+    nside = hp.npix2nside(map.size)
+    alms = np.zeros((3, hp.Alm.getsize(lmax=lmax)), dtype=np.complex)
+    alms[0] = hp.map2alm(map, pol=False, lmax=lmax)
+    alms[0] = hp.almxfl(alms[0], 1 / hp.pixwin(nside=nside, lmax=lmax))
+
+    return alms
 
 
 def load_chan_realization(chan_fmt, chani, reali, lmax,
