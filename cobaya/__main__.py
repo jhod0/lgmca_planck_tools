@@ -10,26 +10,41 @@ import sys
 import yaml
 
 from ..planck import planck_freqs
-from ..like import gen_ffp8_1_like
+from ..like import gen_ffp8_1_like, gen_lgmca_like
 
 
 def make_info(freq, realization,
               data_covname,
               param_covname=None,
-              output_dir='chains'):
+              output_dir='chains',
+              resume=False):
     # Read in the default cobaya YAML for ffp8.1
     with open(os.path.join(os.path.dirname(__file__),
                            'cobaya_ffp8_1.yaml')) as f:
         info = yaml.safe_load(f)
 
     # Create our likelihood
-    my_like = gen_ffp8_1_like(freq, realization, data_covname)
+    if freq.lower() == 'lgmca':
+        my_like_name = 'ffp8_1_raw_lgmca_{:04}'.format(realization)
+        try:
+            lgmca_dir = os.environ['LGMCA_OUTPUT_DIR']
+        except KeyError:
+            print("Don't know where to find LGMCA outputs - set the " \
+                  'environment variable LGMCA_OUTPUT_DIR')
+            raise
+        lgmca_file = os.path.join(lgmca_dir,
+                                  'ffp8_mc_cmb_{:04}'.format(realization),
+                                  'FFP8_v1_aggregated_cls.fits')
+        my_like = gen_lgmca_like(lgmca_file, data_covname)
+    else:
+        my_like_name = 'ffp8_1_raw_{:03}_{:04}'.format(int(freq), realization)
+        my_like = gen_ffp8_1_like(int(freq), realization, data_covname)
 
     # Add our likelihood to the info
-    my_like_name = 'ffp8_1_raw_{:03}_{:04}'.format(freq, realization)
     info['likelihood'] = {my_like_name: {'external': my_like,
                                          'speed': 100}}
     info['output'] = os.path.join(output_dir, my_like_name, my_like_name)
+    info['resume'] = resume
 
     # If we have a proposal matrix, add it
     if param_covname:
@@ -48,8 +63,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Run a Cobaya chain for FFP8.1')
 
-    parser.add_argument('channel', type=int,
-                        help='Planck frequency channel to use. One of: {}'.format(list(planck_freqs)))
+    parser.add_argument('channel', type=str,
+                        help='Planck frequency channel to use, or LGMCA output. ' \
+                             'Either lgmca or one of: {}'.format(list(planck_freqs)))
     parser.add_argument('realization', type=int,
                         help='FFP8.1 realization number, [0-99]')
     parser.add_argument('--output', '-o', dest='output_dir', default='chains',
@@ -58,6 +74,8 @@ if __name__ == '__main__':
                         help='If this flag is added, the script prints the ' \
                              'yaml config passed to Cobaya and does not run ' \
                              'any chain.')
+    parser.add_argument('--resume', action='store_true', default=False,
+                        help='Whether this chain is resuming a previous chain.')
     parser.add_argument('--data-cov', dest='data_cov', default=data_cov_fname,
                         help='Path to data covariance matrix. By default, ' \
                              'the expected cosmic variance for the FFP8.1 ' \
@@ -71,7 +89,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.channel not in planck_freqs:
+    if not ((args.channel.lower() == 'lgmca') or
+            (int(args.channel) in planck_freqs)):
         raise ValueError(
             'Invalid channel {}, should be one of: {}'.format(args.channel,
                                                               list(planck_freqs))
@@ -83,7 +102,8 @@ if __name__ == '__main__':
 
     info = make_info(args.channel, args.realization, args.data_cov,
                      param_covname=args.param_cov,
-                     output_dir=args.output_dir)
+                     output_dir=args.output_dir,
+                     resume=args.resume)
     if args.dry_run:
         yaml.dump(info, sys.stdout)
     else:

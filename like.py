@@ -12,9 +12,68 @@ from .planck.constants import (planck_freqs, ffp8_nu4_central_freqs, ffp8_nu6_ce
 from . import make_binmatrix
 
 
+def getbeam(fwhm=5, lmax=512):
+    '''
+    The beam used in LGMCA output
+    '''
+
+    tor = 0.0174533
+    F = fwhm / 60. * tor
+    l = np.linspace(0,lmax,lmax+1)
+    ell = l*(l+1)
+    bl = np.exp(-ell*F*F /16./np.log(2.))
+
+    return bl
+
+
 _ffp8_1_chan_fmt = os.path.join(os.path.dirname(__file__),
                                 'data', 'ffp8.1_cls', 'R3_beams',
                                 'ffp8.1_cmb_scl_{freq:03}_{real:04}.fits')
+
+def bare_gen_like(Dl_input, cov,
+                  lmin, lmax, delta_ell):
+    bmat = make_binmatrix(lmin, lmax, dl=delta_ell)
+
+    # Bin cov & its inverse
+    binned_cov = np.dot(bmat, np.dot(cov[:lmax + 1, :lmax + 1], bmat.T))
+    inv_binned_cov = np.linalg.inv(binned_cov)
+    cov_det = np.linalg.det(binned_cov)
+
+    # Normalization of likelihood
+    k = binned_cov.shape[0]
+    loglike_norm = -0.5 * (k*np.log(2*np.pi) + np.log(cov_det))
+
+    binned_Dl_input = np.dot(bmat, Dl_input[:lmax + 1])
+    def my_like(# Declaration of our theory requirements
+                _theory={'Cl': {'tt': lmax}},
+                # Declaration of available derived parameters
+                _derived={}):
+        # Dl from theory (the `ell_factor` argument makes Dl)
+        Dl_theory = _theory.get_Cl(ell_factor=True)['tt'][:lmax+1]
+        binned_Dl_theory = np.dot(bmat, Dl_theory)
+
+        diff = binned_Dl_theory - binned_Dl_input
+        chisq = np.dot(diff, np.dot(inv_binned_cov, diff))
+
+        return loglike_norm - chisq/2
+
+    return my_like
+
+
+def gen_lgmca_like(lgmca_file, cov_file,
+                   lmin=70, lmax=2000, delta_ell=30):
+    # Load covariance
+    cov = np.loadtxt(cov_file)
+
+    # Add l (l + 1) factor (i.e. convert cl -> dl)
+    ells = np.arange(lmax + 1)
+    ll1 = ells * (ells + 1) / (2 * np.pi)
+
+    # Load data vector
+    dls = hp.read_cl(lgmca_file)[:lmax + 1] / (getbeam(5, lmax) * hp.pixwin(2048, lmax=lmax))**2
+
+    # 1e12 is K^2 -> \mu K^2
+    return bare_gen_like(1e12 * ll1 * dls, cov, lmin=lmin, lmax=lmax, delta_ell=delta_ell)
 
 
 def gen_ffp8_1_like(planck_channel, ffp8_1_realization, cov_fname,
@@ -28,17 +87,9 @@ def gen_ffp8_1_like(planck_channel, ffp8_1_realization, cov_fname,
     cov_fname: File with the data covariance matrix
     '''
     freqi = np.arange(9)[planck_channel == planck_freqs][0]
-    bmat = make_binmatrix(lmin=lmin, lmax=lmax, dl=delta_ell)
 
-    # Bin cov & its inverse
+    # Load covariance
     cov = np.loadtxt(cov_fname)
-    binned_cov = np.dot(bmat, np.dot(cov[:lmax + 1, :lmax + 1], bmat.T))
-    inv_binned_cov = np.linalg.inv(binned_cov)
-    cov_det = np.linalg.det(binned_cov)
-
-    # Normalization of likelihood
-    k = binned_cov.shape[0]
-    loglike_norm = -0.5 * (k*np.log(2*np.pi) + np.log(cov_det))
 
     # Load rayleigh templates
     rayleigh_base_dir = os.path.join(os.path.dirname(__file__),
@@ -72,19 +123,5 @@ def gen_ffp8_1_like(planck_channel, ffp8_1_realization, cov_fname,
     Dl_input = hp.read_cl(_ffp8_1_chan_fmt.format(freq=planck_channel,
                                                   real=ffp8_1_realization))
     Dl_input = Dl_input[:lmax + 1] - rayleigh_contrib[:lmax + 1]
-    binned_Dl_input = np.dot(bmat, Dl_input[:lmax + 1])
 
-    def my_like(# Declaration of our theory requirements
-                _theory={'Cl': {'tt': lmax}},
-                # Declaration of available derived parameters
-                _derived={}):
-        # Dl from theory (the `ell_factor` argument makes Dl)
-        Dl_theory = _theory.get_Cl(ell_factor=True)['tt'][:lmax+1]
-        binned_Dl_theory = np.dot(bmat, Dl_theory)
-
-        diff = binned_Dl_theory - binned_Dl_input
-        chisq = np.dot(diff, np.dot(inv_binned_cov, diff))
-
-        return loglike_norm - chisq/2
-
-    return my_like
+    return bare_gen_like(Dl_input, cov, lmin=lmin, lmax=lmax, delta_ell=delta_ell)
