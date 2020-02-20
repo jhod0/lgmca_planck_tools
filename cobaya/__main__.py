@@ -15,6 +15,7 @@ from ..like import gen_ffp8_1_like, gen_lgmca_like
 
 def make_info(freq, realization,
               data_covname,
+              binning,
               param_covname=None,
               output_dir='chains',
               resume=False):
@@ -23,6 +24,7 @@ def make_info(freq, realization,
                            'cobaya_ffp8_1.yaml')) as f:
         info = yaml.safe_load(f)
 
+    lmin, lmax, dl = binning
     # Create our likelihood
     if freq.lower() == 'lgmca':
         my_like_name = 'ffp8_1_raw_lgmca_{:04}'.format(realization)
@@ -35,10 +37,12 @@ def make_info(freq, realization,
         lgmca_file = os.path.join(lgmca_dir,
                                   'ffp8_mc_cmb_{:04}'.format(realization),
                                   'FFP8_v1_aggregated_cls.fits')
-        my_like = gen_lgmca_like(lgmca_file, data_covname)
+        my_like = gen_lgmca_like(lgmca_file, data_covname,
+                                 lmin=lmin, lmax=lmax, delta_ell=dl)
     else:
         my_like_name = 'ffp8_1_raw_{:03}_{:04}'.format(int(freq), realization)
-        my_like = gen_ffp8_1_like(int(freq), realization, data_covname)
+        my_like = gen_ffp8_1_like(int(freq), realization, data_covname,
+                                  lmin=lmin, lmax=lmax, delta_ell=dl)
 
     # Add our likelihood to the info
     info['likelihood'] = {my_like_name: {'external': my_like,
@@ -86,6 +90,14 @@ if __name__ == '__main__':
                              'resulting proposal covariance learned from a ' \
                              'MCMC run on the 217 GHz channel.')
 
+    parser.add_argument('--lmin', type=int, default=70,
+                        help='Minimum multipole \ell used in the analysis')
+    parser.add_argument('--lmax', type=int, default=2000,
+                        help='Maximum multipole \ell used in the analysis')
+    parser.add_argument('--delta-ell', type=int, default=30,
+                        help='Delta \ell, the size of binning to use on the ' \
+                             'data vector in the analysis')
+
 
     args = parser.parse_args()
 
@@ -100,7 +112,9 @@ if __name__ == '__main__':
             'Invalid realization {}, should be in 0-99'.format(args.realization)
         )
 
+    print('Using binning', args.lmin, args.lmax, args.delta_ell)
     info = make_info(args.channel, args.realization, args.data_cov,
+                     binning=(args.lmin, args.lmax, args.delta_ell),
                      param_covname=args.param_cov,
                      output_dir=args.output_dir,
                      resume=args.resume)

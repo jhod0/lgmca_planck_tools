@@ -37,11 +37,15 @@ def bare_gen_like(Dl_input, cov,
     # Bin cov & its inverse
     binned_cov = np.dot(bmat, np.dot(cov[:lmax + 1, :lmax + 1], bmat.T))
     inv_binned_cov = np.linalg.inv(binned_cov)
-    cov_det = np.linalg.det(binned_cov)
+    cov_det_sign, log_cov_det = np.linalg.slogdet(binned_cov)
+    if cov_det_sign < 0:
+        raise ValueError('determinant of covariance is negative')
 
     # Normalization of likelihood
     k = binned_cov.shape[0]
-    loglike_norm = -0.5 * (k*np.log(2*np.pi) + np.log(cov_det))
+    loglike_norm = -0.5 * (k*np.log(2*np.pi) + log_cov_det)
+    if np.isinf(loglike_norm):
+        raise ValueError('normalization of likelihood is infinite')
 
     binned_Dl_input = np.dot(bmat, Dl_input[:lmax + 1])
     def my_like(# Declaration of our theory requirements
@@ -54,6 +58,8 @@ def bare_gen_like(Dl_input, cov,
 
         diff = binned_Dl_theory - binned_Dl_input
         chisq = np.dot(diff, np.dot(inv_binned_cov, diff))
+        if np.isinf(chisq):
+            raise ValueError('chisq is infinite')
 
         return loglike_norm - chisq/2
 
