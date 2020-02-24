@@ -5,7 +5,7 @@
 
 from __future__ import division, print_function
 import numpy as np
-from ..binmat import make_binmatrix
+from lgmca_planck_tools.binmat import make_binmatrix
 
 def test_binmatrix_simple():
     bmat_1 = make_binmatrix(2, 5, 2)
