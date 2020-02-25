@@ -15,6 +15,22 @@ class FFP8Like(Likelihood):
     '''
 
     def initialize(self):
+        # Check required parameters
+        if self.data_vector_file is None or self.cov_file is None:
+            raise LoggedError(
+                self.log,
+                'Must specify both `data_vector_file` and `cov_file`.'
+            )
+        if self.lmin is None or self.lmax is None or self.dl is None:
+            raise LoggedError(
+                self.log,
+                'Must specify binning parameters `lmin`, `lmax`, and `dl`.'
+            )
+
+        self.log.debug('Using spectrum binning (lmin, lmax, delta \\ell) = ' \
+                       '({}, {}, {})'.format(self.lmin, self.lmax, self.dl))
+
+
         # Load data vector and covariance
         self.data_vector = hp.read_cl(self.data_vector_file)[:self.lmax + 1]
         self.data_covariance = np.loadtxt(self.cov_file)[:self.lmax + 1, :self.lmax + 1]
@@ -27,20 +43,28 @@ class FFP8Like(Likelihood):
                 raise LoggedError(self.log,
                                   msg.format(self.freq, list(planck_freqs)))
 
+            self.log.debug(
+                'Correcting for Rayleigh scattering in Planck channel {}'.format(self.freq)
+            )
+
             # Compute & subtract the expected Rayleigh contribution for this
             # specific planck channel
             rayleigh_template = RayleighTemplate()
             nu4_eff = ffp8_nu4_central_freqs[freqi]
             nu6_eff = ffp8_nu6_central_freqs[freqi]
-            self.data_vector -= rayleigh_template.TT(nu4_eff=nu4_eff, nu6_eff=nu6_eff, lmax=self.lmax)
+            self.data_vector -= rayleigh_template.TT(nu4_eff=nu4_eff,
+                                                     nu6_eff=nu6_eff,
+                                                     lmax=self.lmax)
+        else:
+            self.log.debug('Skipping Rayleigh scattering correction')
 
-        # Load binning & bin
+        # Load binning info & bin
         self.binmat = make_binmatrix(self.lmin, self.lmax, self.dl)
         self.binned_data_vector = np.dot(self.binmat, self.data_vector)
         self.binned_data_cov = np.dot(self.binmat, np.dot(self.data_covariance, self.binmat.T))
         self.inv_binned_cov = np.linalg.inv(self.binned_data_cov)
 
-        # Normalization of likelihood
+        # Normalization of likelihood - just a multivariate gaussian
         cov_det_sign, log_cov_det = np.linalg.slogdet(self.binned_data_cov)
         if cov_det_sign < 0:
             raise LoggedError(self.log, 'determinant of covariance is negative')

@@ -7,7 +7,7 @@ likelihood:
     # A Planck frequency band. Only needed if do_rayleigh = True
     freq: null
     # Define binning
-    lmin: 70
+    lmin: null
     lmax: null
     dl: 30
     speed: 300
