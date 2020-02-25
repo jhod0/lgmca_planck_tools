@@ -8,8 +8,8 @@ from __future__ import division, print_function
 import healpy as hp
 import numpy as np
 import os
-from .planck.constants import (planck_freqs, ffp8_nu4_central_freqs, ffp8_nu6_central_freqs)
-from . import make_binmatrix
+from ..planck.constants import (planck_freqs, ffp8_nu4_central_freqs, ffp8_nu6_central_freqs)
+from .. import make_binmatrix
 
 
 def getbeam(fwhm=5, lmax=512):
