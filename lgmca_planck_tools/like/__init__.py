@@ -8,6 +8,9 @@ from __future__ import division, print_function
 import healpy as hp
 import numpy as np
 import os
+
+from .FFP8Like import FFP8Like
+from .LGMCALike import LGMCALike
 from ..planck.constants import (planck_freqs, ffp8_nu4_central_freqs, ffp8_nu6_central_freqs)
 from .. import make_binmatrix
 

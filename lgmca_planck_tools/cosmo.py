@@ -7,6 +7,7 @@ from __future__ import division, print_function
 import camb
 # from camb import model, initialpower
 import numpy as np
+import os
 
 # FFP8 cosmology, flat \Lambda-CDM
 fiducial_ffp8_params = {
@@ -48,6 +49,73 @@ def compute_ffp8(ombh2, omch2, omnuh2, H0, tau, As, ns):
 
     result = camb.get_results(params)
     return result.get_cmb_power_spectra(params, CMB_unit='muK')
+
+
+class RayleighTemplate:
+    '''
+    A template of the effect of Rayleigh scattering on CMB temperature and
+    polarization anisotropies, derived from a fixed cosmology.
+
+    By default, it loads the templates for the fiducial FFP8.1 cosmology
+    derived from the `rayleigh` branch of CAMB.
+    '''
+    __rayleigh_data_path = os.path.join(os.path.dirname(__file__),
+                                        'data', 'rayleigh', 'ffp8_1_rayleigh',
+                                        'Rayleigh')
+    def __init__(self,
+                 path_nu4=os.path.join(__rayleigh_data_path,
+                                       'planck_FFP8_1_nu4_lensedCls.dat'),
+                 path_nu6=os.path.join(__rayleigh_data_path,
+                                       'planck_FFP8_1_nu6_lensedCls.dat'),
+                 path_nu8=os.path.join(__rayleigh_data_path,
+                                       'planck_FFP8_1_nu8_lensedCls.dat')):
+        self.nu_ref = np.loadtxt(path_nu4 + '_freqs')[5]
+
+        # Load rayleigh templates
+        header = np.zeros((2, 5))
+        header[1, 0] = 1
+        self.rayleigh_base = np.vstack((header, np.loadtxt(path_nu4)))
+        self.rayleigh_nu4 = np.vstack((header, np.loadtxt(path_nu4 + '_6_6')))
+        self.rayleigh_nu6 = np.vstack((header, np.loadtxt(path_nu6 + '_6_6')))
+        self.rayleigh_nu8 = np.vstack((header, np.loadtxt(path_nu8 + '_6_6')))
+
+    def rayleigh_contrib(self, nu4_eff, nu6_eff=None, nu8_eff=None, lmax=2000):
+        '''
+        Returns the total expected rayleigh contribution to each
+        D_\\ell = (\\ell (\ell + 1) / 2pi) C_\\ell spectra, at a given set of
+        effective frequencies. Effective frequencies of different orders may
+        differ from each other due to a channel's bandpass.
+
+        returns: A np.array of doubles of shape (lmax + 1, 5). Each row
+                 corresponds to a multipole moment \\ell, and each column
+                 corresponds to (\\ell, TT, EE, BB, TE)
+        '''
+        if nu6_eff is None:
+            nu6_eff = nu4_eff
+        if nu8_eff is None:
+            nu8_eff = nu6_eff
+
+        output = 0
+        for template, nu_eff, pow in [(self.rayleigh_nu4, nu4_eff, 4),
+                                      (self.rayleigh_nu6, nu6_eff, 6),
+                                      (self.rayleigh_nu8, nu6_eff, 8)]:
+            output += (template - self.rayleigh_base)[:lmax + 1, :] * (nu_eff / self.nu_ref) ** pow
+        output[:, 0] = np.arange(lmax + 1)
+        return output
+
+    def TT(self, nu4_eff, nu6_eff=None, nu8_eff=None, lmax=2000):
+        '''
+        Returns the expected rayleigh contribution to the temperature
+        autocorrelation spectrum D_\\ell^{TT}, in units of (mu K^2).
+
+        Each nu*_eff has the same meaning as in `rayleigh_contrib`.
+
+        returns: A 1D np.array of size (lmax + 1), for the rayleigh contribution
+                 at each \\ell from 0 to lmax.
+        '''
+        return self.rayleigh_contrib(nu4_eff, nu6_eff=nu6_eff,
+                                     nu8_eff=nu8_eff, lmax=lmax)[:, 1]
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt

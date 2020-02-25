@@ -1,0 +1,13 @@
+likelihood:
+  __self__:
+    # Should be a D_\ell spectrum as saved by healpy.write_cl
+    data_vector_file: null
+    cov_file: null
+    do_rayleigh: true
+    # A Planck frequency band. Only needed if do_rayleigh = True
+    freq: null
+    # Define binning
+    lmin: 70
+    lmax: null
+    dl: 30
+    speed: 300
