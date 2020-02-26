@@ -1,0 +1,1 @@
+ffp8_1_expected_cosmicvar.txt filter=lfs diff=lfs merge=lfs -text
