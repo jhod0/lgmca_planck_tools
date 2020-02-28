@@ -31,3 +31,10 @@ ffp8_nu4_central_freqs = np.array([30, 44, 70, 105, 148, 223, 372, 577, 891])
 ffp8_nu6_central_freqs = np.array([30, 44, 70, 108, 151, 233, 378, 585, 905])
 ffp8_nu4_central_freqs.setflags(write=False)
 ffp8_nu6_central_freqs.setflags(write=False)
+
+# T_{CMB} -> T_{antenna} conversion factor
+# The LGMCA inputs are expected in T_{antenna}, the FFP maps are in T_{CMB},
+# so this is needed for that conversion
+col_cmb = np.array([0.977074, 0.951459, 0.882496, 0.777295, 0.604833,
+                    0.334417, 0.0775445, 0.00626735, 6.37740e-05])
+col_cmb.setflags(write=False)
