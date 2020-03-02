@@ -8,10 +8,53 @@ It includes likelihoods to run MCMC chains with the
 [Cobaya](https://cobaya.readthedocs.io/en/latest/) monte carlo sampling
 software.
 
+## Installation
+
+First, clone this repository & enter the directory:
+
+```
+$ git clone git@github.com:jhod0/lgmca_planck_tools.git
+$ cd lgmca_planck_tools
+```
+
+Then, install via pip:
+
+```
+$ pip install .
+```
+
+This will use the `setup.py` in this repository. If you wish to edit the code
+in this repository without having to reinstall it every time, add the
+`--editable` flag to `pip install`.
+
 ## LGMCA inversion
 
 TODO
 
 ## Likelihoods
 
-TODO
+This package includes likelihoods to be run with the Cobaya cosmological MCMC
+sampler. They are tested to work with Cobaya version 2.0.5+.
+
+Once this package is installed you can add a likelihood to any cobaya init
+file, e.g.:
+
+```yaml
+likelihood:
+  lgmca_planck_tools.like.FFP8Like:
+    data_vector_file: /path/to/data/vector.fits
+    cov_file: /path/to/data/covariance.txt
+    do_rayleigh: false
+    lmin: 70
+    lmax: 2000
+    dl: 30
+```
+
+This will load a CMB spectrum (`D_\ell = \ell (\ell + 1) C_\ell / (2 \pi)`, in
+units of `\mu K^2`, stored via `healpy.write_cl()`), and a `D_\ell` covariance,
+and run an MCMC chain sampling cosmological parameters to fit to the spectrum.
+
+It will bin the input vector from `\ell = 30` to `\ell = 2000` in bins of 30,
+and not attempt to account for Rayleigh scattering.
+
+TODO: other likelihoods
